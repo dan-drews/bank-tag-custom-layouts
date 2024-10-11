@@ -64,6 +64,8 @@ public class BankTagLayoutsToolsPlugin extends Plugin
 //			TagTab tagTab = new TagTab();
 //			tagTab.setTag("mytag");
 ////			tagTab.setLayout(layout);
+
+
 			plugin.clientThread.invokeLater(() -> {
 				plugin.bankTagsService.openBankTag(bankTag);
 			});

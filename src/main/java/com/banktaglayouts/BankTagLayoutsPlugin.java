@@ -95,7 +95,10 @@ import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.bank.BankSearch;
 import net.runelite.client.plugins.banktags.BankTagsPlugin;
+import net.runelite.client.plugins.banktags.BankTagsService;
 import net.runelite.client.plugins.banktags.TagManager;
+import net.runelite.client.plugins.banktags.tabs.AutoLayout;
+import net.runelite.client.plugins.banktags.tabs.LayoutManager;
 import net.runelite.client.plugins.banktags.tabs.TabInterface;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ColorUtil;
@@ -133,53 +136,24 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 	public static final int BANK_ITEM_WIDTH = 36;
 	public static final int BANK_ITEM_HEIGHT = 32;
 
-	@Inject
-	Client client;
-
-	@Inject
-	private OverlayManager overlayManager;
-
-	@Inject
-	private MouseManager mouseManager;
-
-	@Inject
-	private KeyManager keyManager;
-
-	@Inject
-	private SpriteManager spriteManager;
-
-	@Inject
-	public ItemManager itemManager;
-
-	@Inject
-	public ConfigManager configManager;
-
-	@Inject
-	private ClientThread clientThread;
-
-	// This is package-private for use in FakeItemOverlay because if it's @Injected there it's a different TabInterface due to some bug I don't understand.
-	@Inject
-	TabInterface tabInterface;
-
-	@Inject
-	private TagManager tagManager;
-
-	@Inject
-	private FakeItemOverlay fakeItemOverlay;
-
-	@Inject
-	private BankSearch bankSearch;
-
-	@Inject
-	private ChatboxPanelManager chatboxPanelManager;
-
-	@Inject
-	private BankTagLayoutsConfig config;
-
-	@Inject
-	public Gson gson;
-
-	@Inject private UsedToBeReflection copyPaste;
+	@Inject public Client client;
+	@Inject public OverlayManager overlayManager;
+	@Inject public MouseManager mouseManager;
+	@Inject public KeyManager keyManager;
+	@Inject public SpriteManager spriteManager;
+	@Inject public ItemManager itemManager;
+	@Inject public ConfigManager configManager;
+	@Inject public ClientThread clientThread;
+	@Inject public TabInterface tabInterface;
+	@Inject public TagManager tagManager;
+	@Inject public BankTagsService bankTagsService;
+	@Inject public FakeItemOverlay fakeItemOverlay;
+	@Inject public BankSearch bankSearch;
+	@Inject public ChatboxPanelManager chatboxPanelManager;
+	@Inject public BankTagLayoutsConfig config;
+	@Inject public Gson gson;
+	@Inject public UsedToBeReflection copyPaste;
+	@Inject public LayoutManager layoutManager;
 
 	// The current indexes for where each widget should appear in the custom bank layout. Should be ignored if there is not tab active.
 	private final Map<Integer, Widget> indexToWidget = new HashMap<>();
@@ -873,10 +847,10 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 
 		Collection<Integer> layoutItemIds = layout.getAllUsedItemIds();
 		for (Integer  itemId : layoutItemIds) {
-			if (potionStorage.count(itemId) > 0) {
+//			if (potionStorage.count(itemId) > 0) {
 //				Widget itemWidget = createItemWidget(new Item(itemId, potionStorage.count(itemId)));
 //				bankItems.add(itemWidget);
-			}
+//			}
 		}
 
 		if (!hasLayoutEnabled(layoutable)) {
@@ -1612,11 +1586,11 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 
 		List<String> data = new ArrayList<>();
 		data.add(tagName);
-		String tagTabIconItemId = configManager.getConfiguration(BankTagsPlugin.CONFIG_GROUP, BankTagsPlugin.ICON_SEARCH + tagName);
-		if (tagTabIconItemId == null) {
-			tagTabIconItemId = "" + ItemID.SPADE;
-		}
-		data.add(tagTabIconItemId);
+//		String tagTabIconItemId = configManager.getConfiguration(BankTagsPlugin.CONFIG_GROUP, BankTagsPlugin.ICON_SEARCH + tagName);
+//		if (tagTabIconItemId == null) {
+//			tagTabIconItemId = "" + ItemID.SPADE;
+//		}
+//		data.add(tagTabIconItemId);
 
 		for (Integer item : tagManager.getItemsForTag(tagName)) {
 			data.add(String.valueOf(item));
