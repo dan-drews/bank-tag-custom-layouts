@@ -57,7 +57,7 @@ public class PotionStorage {
 
     @Subscribe
     public void onVarbitChanged(VarbitChanged varbitChanged) {
-        if (potionStoreVars != null && potionStoreVars.contains(varbitChanged.getVarpId())) {
+        if (potionStoreVars != null && potionStoreVars.contains(varbitChanged.getVarpId()) || (varbitChanged.getVarbitId() == Varbits.CURRENT_BANK_TAB && varbitChanged.getValue() == 15)) {
             cachePotions = true;
             layout = true;
         }

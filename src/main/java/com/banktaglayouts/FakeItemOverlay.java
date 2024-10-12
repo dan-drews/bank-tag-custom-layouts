@@ -110,65 +110,65 @@ public class FakeItemOverlay extends Overlay {
 					int quantityType = client.getVarbitValue(Varbits.BANK_QUANTITY_TYPE);
 					int requestQty = client.getVarbitValue(Varbits.BANK_REQUESTEDQUANTITY);
 					// ~script2759
-					String suffix;
-					switch (quantityType)
-					{
-						default:
-							suffix = "1";
-							break;
-						case 1:
-							suffix = "5";
-							break;
-						case 2:
-							suffix = "10";
-							break;
-						case 3:
-							suffix = Integer.toString(Math.max(1, requestQty));
-							break;
-						case 4:
-							suffix = "All";
-							break;
-					}
-					c.clearActions();
-
-					c.setAction(0, "Withdraw-" + suffix);
-					if (quantityType != 0)
-					{
-						c.setAction(1, "Withdraw-1");
-					}
-					c.setAction(2, "Withdraw-5");
-					c.setAction(3, "Withdraw-10");
-					if (requestQty > 0)
-					{
-						c.setAction(4, "Withdraw-" + requestQty);
-					}
-					c.setAction(5, "Withdraw-X");
-					c.setAction(6, "Withdraw-All");
-					c.setAction(7, "Withdraw-All-but-1");
-					if (client.getVarbitValue(Varbits.BANK_LEAVEPLACEHOLDERS) == 0)
-					{
-						c.setAction(8, "Placeholder");
-					}
-					c.setAction(9, "Examine");
-
-					int posX = (fakeItem.index % BANK_ITEMS_PER_ROW) * (BANK_ITEM_WIDTH + BANK_ITEM_X_PADDING) + BANK_ITEM_START_X;
-					int posY = (fakeItem.index / BANK_ITEMS_PER_ROW) * (BANK_ITEM_HEIGHT + BANK_ITEM_Y_PADDING);
-
-					ItemComposition def = client.getItemDefinition(fakeItemId);
-					c.setItemId(fakeItemId);
-					c.setItemQuantity(fakeItem.quantity);
-					c.setItemQuantityMode(ItemQuantityMode.STACKABLE);
-					c.setName("<col=ff9040>" + def.getName() + "</col>");
-					c.setOriginalHeight(BankTagLayoutsPlugin.BANK_ITEM_HEIGHT);
-					c.setOriginalWidth(BankTagLayoutsPlugin.BANK_ITEM_WIDTH);
-					c.setOriginalX(posX);
-					c.setOriginalY(posY);
-					c.setHidden(false);
-					c.revalidate();
+//					String suffix;
+//					switch (quantityType)
+//					{
+//						default:
+//							suffix = "1";
+//							break;
+//						case 1:
+//							suffix = "5";
+//							break;
+//						case 2:
+//							suffix = "10";
+//							break;
+//						case 3:
+//							suffix = Integer.toString(Math.max(1, requestQty));
+//							break;
+//						case 4:
+//							suffix = "All";
+//							break;
+//					}
+//					c.clearActions();
+//
+//					c.setAction(0, "Withdraw-" + suffix);
+//					if (quantityType != 0)
+//					{
+//						c.setAction(1, "Withdraw-1");
+//					}
+//					c.setAction(2, "Withdraw-5");
+//					c.setAction(3, "Withdraw-10");
+//					if (requestQty > 0)
+//					{
+//						c.setAction(4, "Withdraw-" + requestQty);
+//					}
+//					c.setAction(5, "Withdraw-X");
+//					c.setAction(6, "Withdraw-All");
+//					c.setAction(7, "Withdraw-All-but-1");
+//					if (client.getVarbitValue(Varbits.BANK_LEAVEPLACEHOLDERS) == 0)
+//					{
+//						c.setAction(8, "Placeholder");
+//					}
+//					c.setAction(9, "Examine");
+//
+//					int posX = (fakeItem.index % BANK_ITEMS_PER_ROW) * (BANK_ITEM_WIDTH + BANK_ITEM_X_PADDING) + BANK_ITEM_START_X;
+//					int posY = (fakeItem.index / BANK_ITEMS_PER_ROW) * (BANK_ITEM_HEIGHT + BANK_ITEM_Y_PADDING);
+//
+//					ItemComposition def = client.getItemDefinition(fakeItemId);
+//					c.setItemId(fakeItemId);
+//					c.setItemQuantity(fakeItem.quantity);
+//					c.setItemQuantityMode(ItemQuantityMode.STACKABLE);
+//					c.setName("<col=ff9040>" + def.getName() + "</col>");
+//					c.setOriginalHeight(BankTagLayoutsPlugin.BANK_ITEM_HEIGHT);
+//					c.setOriginalWidth(BankTagLayoutsPlugin.BANK_ITEM_WIDTH);
+//					c.setOriginalX(posX);
+//					c.setOriginalY(posY);
+//					c.setHidden(false);
+//					c.revalidate();
 
 					boolean showQuantity = itemManager.getItemComposition(fakeItemId).isStackable() || fakeItem.quantity != 1;
-					/*BufferedImage image = itemManager.getImage(fakeItemId, fakeItem.quantity, showQuantity);
-					graphics.drawImage(image, x, y, image.getWidth(), image.getHeight(), null);*/
+					BufferedImage image = itemManager.getImage(fakeItemId, fakeItem.quantity, showQuantity);
+					graphics.drawImage(image, x, y, image.getWidth(), image.getHeight(), null);
 				}
 			}
 		}

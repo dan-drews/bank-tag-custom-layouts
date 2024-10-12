@@ -9,9 +9,8 @@ import com.google.common.util.concurrent.Runnables;
 import com.google.gson.Gson;
 import com.google.inject.Provides;
 import inventorysetupz.InventorySetup;
-import java.awt.Color;
-import java.awt.Rectangle;
-import java.awt.Toolkit;
+
+import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -78,8 +77,10 @@ import net.runelite.api.widgets.WidgetPositionMode;
 import net.runelite.api.widgets.WidgetType;
 import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.config.ConfigProfile;
+import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.ProfileChanged;
@@ -155,6 +156,8 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 	@Inject public Gson gson;
 	@Inject public UsedToBeReflection copyPaste;
 	@Inject public LayoutManager layoutManager;
+	@Inject public PotionStorage potionStorage;
+	@Inject public EventBus eventBus;
 
 	// The current indexes for where each widget should appear in the custom bank layout. Should be ignored if there is not tab active.
 	private final Map<Integer, Widget> indexToWidget = new HashMap<>();
@@ -296,7 +299,7 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		spriteManager.addSpriteOverrides(Sprites.values());
 		mouseManager.registerMouseListener(this);
 		keyManager.registerKeyListener(antiDrag);
-
+		eventBus.register(potionStorage);
 		clientThread.invokeLater(() -> {
 			if (client.getGameState() == GameState.LOGGED_IN) {
 				showLayoutPreviewButton = null;
@@ -304,6 +307,7 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 				bankSearch.layoutBank();
 			}
 		});
+		potionStorage.cachePotions = true;
 	}
 
 	@Override
@@ -981,7 +985,12 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 			boolean isLayoutPlaceholder = !any.isPresent();
 			int quantity = any.isPresent() ? any.get().getItemQuantity() : -1;
 			int fakeItemItemId = any.isPresent() ? any.get().getItemId() : itemId;
-//			fakeItems.add(new FakeItem(index, getNonPlaceholderId(fakeItemItemId), isLayoutPlaceholder, quantity));
+
+			if (potionStorage.count(itemId) > 0) {
+				quantity = potionStorage.count(itemId);
+				isLayoutPlaceholder = false;
+			}
+
 			fakeItems.add(new FakeItem(index, fakeItemItemId, isLayoutPlaceholder, quantity));
 		}
 		return fakeItems;
@@ -1079,12 +1088,18 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		int index = getIndexForMousePosition(true);
 		FakeItem fakeItem = fakeItems.stream().filter(fake -> fake.index == index).findAny().orElse(null);
 		if (fakeItem != null) {
-			draggedItemIndex = fakeItem.index;
-			dragStartX = mouseEvent.getX();
-			dragStartY = mouseEvent.getY();
-			dragStartScroll = client.getWidget(ComponentID.BANK_ITEM_CONTAINER).getScrollY();
-			antiDrag.startDrag();
-			mouseEvent.consume();
+			// TODO: Come back here. Drag and drop isn't working for potions. I hope I don't need to implement
+			// my own drag and drop logic for this, but it may be required.
+			// leaving the semicolon off so i pick up tomorrow
+			boolean isInPotionStorage = potionStorage.count(fakeItem.itemId) > 0
+			if(!isInPotionStorage) {
+				draggedItemIndex = fakeItem.index;
+				dragStartX = mouseEvent.getX();
+				dragStartY = mouseEvent.getY();
+				dragStartScroll = client.getWidget(ComponentID.BANK_ITEM_CONTAINER).getScrollY();
+				antiDrag.startDrag();
+				mouseEvent.consume();
+			}
 		}
 		return mouseEvent;
 	}
@@ -1321,16 +1336,166 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		if (index == -1) return;
 		int itemIdAtIndex = layout.getItemAtIndex(index);
 
-		if (itemIdAtIndex != -1 && !indexToWidget.containsKey(index)) {
-			boolean preventPlaceholderMenuBug =
-					config.preventVanillaPlaceholderMenuBug() &&
-							client.getDraggedWidget() != null;
+		if(itemIdAtIndex != -1){
 
-			client.createMenuEntry(-1)
-					.setOption(REMOVE_FROM_LAYOUT_MENU_OPTION)
-					.setType(preventPlaceholderMenuBug ? MenuAction.CC_OP : MenuAction.RUNELITE_OVERLAY)
-					.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-					.setParam0(index);
+			if(potionStorage.count(itemIdAtIndex) > 0){
+
+//				Widget bankItemContainer = client.getWidget(ComponentID.BANK_ITEM_CONTAINER);
+//				if (bankItemContainer == null) return;
+//				Widget c = bankItemContainer.getChild(index);
+//				ItemComposition def = client.getItemDefinition(itemIdAtIndex);
+//				c.setItemId(itemIdAtIndex);
+//				c.setItemQuantity(potionStorage.count(itemIdAtIndex));
+//				c.setName("<col=ff9040>" + def.getName() + "</col>");
+//				c.clearActions();
+
+				int quantityType = client.getVarbitValue(Varbits.BANK_QUANTITY_TYPE);
+				int requestQty = client.getVarbitValue(Varbits.BANK_REQUESTEDQUANTITY);
+				String suffix;
+				switch (quantityType) {
+					default:
+						suffix = "1";
+						break;
+					case 1:
+						suffix = "5";
+						break;
+					case 2:
+						suffix = "10";
+						break;
+					case 3:
+						suffix = Integer.toString(Math.max(1, requestQty));
+						break;
+					case 4:
+						suffix = "All";
+						break;
+				}
+
+//				potionStorage.prepareWidgets();
+//				c.setAction(0, "Withdraw-" + suffix);
+//				if (quantityType != 0)
+//				{
+//					c.setAction(1, "Withdraw-1");
+//				}
+//				c.setAction(2, "Withdraw-5");
+//				c.setAction(3, "Withdraw-10");
+//				if (requestQty > 0)
+//				{
+//					c.setAction(4, "Withdraw-" + requestQty);
+//				}
+//				c.setAction(5, "Withdraw-X");
+//				c.setAction(6, "Withdraw-All");
+//				c.setAction(7, "Withdraw-All-but-1");
+//				if (client.getVarbitValue(Varbits.BANK_LEAVEPLACEHOLDERS) == 0)
+//				{
+//					c.setAction(8, "Placeholder");
+//				}
+//				c.setAction(9, "Examine");
+//
+//				c.setOpacity(0);
+//				c.revalidate();
+				potionStorage.prepareWidgets();
+				int potStorageIndex = potionStorage.find(itemIdAtIndex);
+				int param0 = potStorageIndex * PotionStorage.COMPONENTS_PER_POTION;
+
+				MenuEntry entry = client.createMenuEntry(-1)
+						.setIdentifier(8)
+						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+						.setItemId(itemIdAtIndex)
+						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+						.setOption("Withdraw-All-but-1")
+						.setParam0(param0)
+						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+
+				client.createMenuEntry(-1)
+						.setIdentifier(7)
+						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+						.setItemId(itemIdAtIndex)
+						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+						.setOption("Withdraw-All")
+						.setParam0(param0)
+						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+
+
+				client.createMenuEntry(-1)
+						.setIdentifier(6)
+						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+						.setItemId(itemIdAtIndex)
+						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+						.setOption("Withdraw-X")
+						.setParam0(param0)
+						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+
+
+				if (requestQty > 0)
+				{
+					client.createMenuEntry(-1)
+							.setIdentifier(5)
+							.setType(MenuAction.CC_OP_LOW_PRIORITY)
+							.setItemId(itemIdAtIndex)
+							.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+							.setOption("Withdraw-" + requestQty)
+							.setParam0(param0)
+							.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+				}
+
+				client.createMenuEntry(-1)
+						.setIdentifier(4)
+						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+						.setItemId(itemIdAtIndex)
+						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+						.setOption("Withdraw-10")
+						.setParam0(param0)
+						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+
+
+				client.createMenuEntry(-1)
+						.setIdentifier(3)
+						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+						.setItemId(itemIdAtIndex)
+						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+						.setOption("Withdraw-5")
+						.setParam0(param0)
+						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+
+
+				if(quantityType != 0) {
+					client.createMenuEntry(-1)
+							.setIdentifier(2)
+							.setType(MenuAction.CC_OP_LOW_PRIORITY)
+							.setItemId(itemIdAtIndex)
+							.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+							.setOption("Withdraw-1")
+							.setParam0(param0)
+							.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+				}
+
+				client.createMenuEntry(-1)
+						.setIdentifier(1)
+						.setType(MenuAction.CC_OP)
+						.setItemId(itemIdAtIndex)
+						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+						.setOption("Withdraw-" + suffix)
+						.setParam0(param0)
+						.setDeprioritized(false)
+						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT)
+						.onClick(menuEntry -> {
+							final String message = new ChatMessageBuilder()
+									.append("The default left click option for '").append(Text.removeTags(entry.getTarget())).append("' ")
+									.append("has been reset.")
+									.build();
+						});
+
+			} else if (!indexToWidget.containsKey(index)) {
+				boolean preventPlaceholderMenuBug =
+						config.preventVanillaPlaceholderMenuBug() &&
+								client.getDraggedWidget() != null;
+
+				client.createMenuEntry(-1)
+						.setOption(REMOVE_FROM_LAYOUT_MENU_OPTION)
+						.setType(preventPlaceholderMenuBug ? MenuAction.CC_OP : MenuAction.RUNELITE_OVERLAY)
+						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+						.setParam0(index);
+			}
 		}
 	}
 
