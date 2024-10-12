@@ -69,13 +69,7 @@ import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetLoaded;
-import net.runelite.api.widgets.ComponentID;
-import net.runelite.api.widgets.InterfaceID;
-import net.runelite.api.widgets.JavaScriptCallback;
-import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetPositionMode;
-import net.runelite.api.widgets.WidgetType;
-import net.runelite.api.widgets.WidgetUtil;
+import net.runelite.api.widgets.*;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.config.ConfigManager;
@@ -899,17 +893,33 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 			return; // layout not enabled.
 		}
 
-		List<Widget> bankItems = Arrays.stream(client.getWidget(ComponentID.BANK_ITEM_CONTAINER).getDynamicChildren())
+		Widget bankContainer = client.getWidget(ComponentID.BANK_ITEM_CONTAINER);
+		List<Widget> bankItems = Arrays.stream(bankContainer.getDynamicChildren())
 				.filter(bankItem -> !bankItem.isHidden() && bankItem.getItemId() >= 0)
 				.collect(Collectors.toList());
 
 
+
 		Collection<Integer> layoutItemIds = layout.getAllUsedItemIds();
 		for (Integer  itemId : layoutItemIds) {
-//			if (potionStorage.count(itemId) > 0) {
-//				Widget itemWidget = createItemWidget(new Item(itemId, potionStorage.count(itemId)));
-//				bankItems.add(itemWidget);
-//			}
+			if (potionStorage.count(itemId) > 0) {
+				//Widget itemWidget = createItemWidget(new Item(itemId, potionStorage.count(itemId)));
+				// Re-use hidden bank items since I'm not sure how to create a new widget.
+				Widget potionWidget = Arrays.stream(bankContainer.getDynamicChildren())
+						.filter(bankItem -> bankItem.isHidden() || bankItem.getItemId() < 0)
+						.collect(Collectors.toList())
+						.stream().findFirst().get();
+
+				ItemComposition def = client.getItemDefinition(itemId);
+				potionWidget.setItemId(itemId);
+				potionWidget.setItemQuantity(potionStorage.count(itemId));
+				potionWidget.setItemQuantityMode(ItemQuantityMode.STACKABLE);
+				potionWidget.setName("<col=ff9040>" + def.getName() + "</col>");
+				potionWidget.setHidden(false);
+				potionWidget.revalidate();
+
+				bankItems.add(potionWidget);
+			}
 		}
 
 		if (!hasVanillaOrHubLayoutEnabled(layoutable)) {
@@ -930,10 +940,11 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		indexToWidget.putAll(assignItemPositions(layout, bankItems));
 		moveDuplicateItem();
 		updateFakeItems(layout);
-
+		//indexToWidget.putAll(fakeItemOverlay.getPotionStorageIndexToWidgets());
 		for (Widget bankItem : bankItems) {
 			bankItem.setOnDragCompleteListener((JavaScriptCallback) (ev) -> customBankTagOrderInsert(layoutable, ev.getSource()));
 		}
+		//fakeItemOverlay.setOnDragCompleteListener(ev->customBankTagOrderInsert(layoutable, ev.getSource()));
 
 		setItemPositions(indexToWidget);
 
@@ -1091,7 +1102,7 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 			// TODO: Come back here. Drag and drop isn't working for potions. I hope I don't need to implement
 			// my own drag and drop logic for this, but it may be required.
 			// leaving the semicolon off so i pick up tomorrow
-			boolean isInPotionStorage = potionStorage.count(fakeItem.itemId) > 0
+			boolean isInPotionStorage = potionStorage.count(fakeItem.itemId) > 0;
 			if(!isInPotionStorage) {
 				draggedItemIndex = fakeItem.index;
 				dragStartX = mouseEvent.getX();
@@ -1324,8 +1335,6 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 	}
 
 	private void addFakeItemMenuEntries(MenuEntryAdded menuEntryAdded) {
-		if (!menuEntryAdded.getOption().equalsIgnoreCase("cancel")) return;
-
 		LayoutableThing currentLayoutableThing = getCurrentLayoutableThing();
 		if (!config.showLayoutPlaceholders() || !hasLayoutEnabled(currentLayoutableThing)) {
 			return;
@@ -1335,40 +1344,52 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 		int index = getIndexForMousePosition(true);
 		if (index == -1) return;
 		int itemIdAtIndex = layout.getItemAtIndex(index);
+		if(itemIdAtIndex == -1) return;
+		if(potionStorage.count(itemIdAtIndex) > 0){
+			int potStorageIndex = potionStorage.find(itemIdAtIndex);
+			potionStorage.prepareWidgets();
+			MenuEntry entry = menuEntryAdded.getMenuEntry();
+			entry.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+			entry.setParam0(potStorageIndex * PotionStorage.COMPONENTS_PER_POTION);
+			return;
+		}
 
-		if(itemIdAtIndex != -1){
+		if (!menuEntryAdded.getOption().equalsIgnoreCase("cancel")) return;
 
-			if(potionStorage.count(itemIdAtIndex) > 0){
 
+
+
+//			if(potionStorage.count(itemIdAtIndex) > 0){
+//
 //				Widget bankItemContainer = client.getWidget(ComponentID.BANK_ITEM_CONTAINER);
 //				if (bankItemContainer == null) return;
 //				Widget c = bankItemContainer.getChild(index);
-//				ItemComposition def = client.getItemDefinition(itemIdAtIndex);
-//				c.setItemId(itemIdAtIndex);
-//				c.setItemQuantity(potionStorage.count(itemIdAtIndex));
-//				c.setName("<col=ff9040>" + def.getName() + "</col>");
-//				c.clearActions();
-
-				int quantityType = client.getVarbitValue(Varbits.BANK_QUANTITY_TYPE);
-				int requestQty = client.getVarbitValue(Varbits.BANK_REQUESTEDQUANTITY);
-				String suffix;
-				switch (quantityType) {
-					default:
-						suffix = "1";
-						break;
-					case 1:
-						suffix = "5";
-						break;
-					case 2:
-						suffix = "10";
-						break;
-					case 3:
-						suffix = Integer.toString(Math.max(1, requestQty));
-						break;
-					case 4:
-						suffix = "All";
-						break;
-				}
+////				ItemComposition def = client.getItemDefinition(itemIdAtIndex);
+////				c.setItemId(itemIdAtIndex);
+////				c.setItemQuantity(potionStorage.count(itemIdAtIndex));
+////				c.setName("<col=ff9040>" + def.getName() + "</col>");
+////				c.clearActions();
+//
+//				int quantityType = client.getVarbitValue(Varbits.BANK_QUANTITY_TYPE);
+//				int requestQty = client.getVarbitValue(Varbits.BANK_REQUESTEDQUANTITY);
+//				String suffix;
+//				switch (quantityType) {
+//					default:
+//						suffix = "1";
+//						break;
+//					case 1:
+//						suffix = "5";
+//						break;
+//					case 2:
+//						suffix = "10";
+//						break;
+//					case 3:
+//						suffix = Integer.toString(Math.max(1, requestQty));
+//						break;
+//					case 4:
+//						suffix = "All";
+//						break;
+//				}
 
 //				potionStorage.prepareWidgets();
 //				c.setAction(0, "Withdraw-" + suffix);
@@ -1393,99 +1414,103 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 //
 //				c.setOpacity(0);
 //				c.revalidate();
-				potionStorage.prepareWidgets();
-				int potStorageIndex = potionStorage.find(itemIdAtIndex);
-				int param0 = potStorageIndex * PotionStorage.COMPONENTS_PER_POTION;
-
-				MenuEntry entry = client.createMenuEntry(-1)
-						.setIdentifier(8)
-						.setType(MenuAction.CC_OP_LOW_PRIORITY)
-						.setItemId(itemIdAtIndex)
-						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-						.setOption("Withdraw-All-but-1")
-						.setParam0(param0)
-						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
-
-				client.createMenuEntry(-1)
-						.setIdentifier(7)
-						.setType(MenuAction.CC_OP_LOW_PRIORITY)
-						.setItemId(itemIdAtIndex)
-						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-						.setOption("Withdraw-All")
-						.setParam0(param0)
-						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
 
 
-				client.createMenuEntry(-1)
-						.setIdentifier(6)
-						.setType(MenuAction.CC_OP_LOW_PRIORITY)
-						.setItemId(itemIdAtIndex)
-						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-						.setOption("Withdraw-X")
-						.setParam0(param0)
-						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
 
 
-				if (requestQty > 0)
-				{
-					client.createMenuEntry(-1)
-							.setIdentifier(5)
-							.setType(MenuAction.CC_OP_LOW_PRIORITY)
-							.setItemId(itemIdAtIndex)
-							.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-							.setOption("Withdraw-" + requestQty)
-							.setParam0(param0)
-							.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
-				}
+//
+//				potionStorage.prepareWidgets();
+//				int potStorageIndex = potionStorage.find(itemIdAtIndex);
+//				int param0 = potStorageIndex * PotionStorage.COMPONENTS_PER_POTION;
+//
+//				MenuEntry entry = client.createMenuEntry(-1)
+//						.setIdentifier(8)
+//						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+//						.setItemId(itemIdAtIndex)
+//						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//						.setOption("Withdraw-All-but-1")
+//						.setParam0(param0)
+//						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+//
+//				client.createMenuEntry(-1)
+//						.setIdentifier(7)
+//						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+//						.setItemId(itemIdAtIndex)
+//						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//						.setOption("Withdraw-All")
+//						.setParam0(param0)
+//						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+//
+//
+//				client.createMenuEntry(-1)
+//						.setIdentifier(6)
+//						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+//						.setItemId(itemIdAtIndex)
+//						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//						.setOption("Withdraw-X")
+//						.setParam0(param0)
+//						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+//
+//
+//				if (requestQty > 0)
+//				{
+//					client.createMenuEntry(-1)
+//							.setIdentifier(5)
+//							.setType(MenuAction.CC_OP_LOW_PRIORITY)
+//							.setItemId(itemIdAtIndex)
+//							.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//							.setOption("Withdraw-" + requestQty)
+//							.setParam0(param0)
+//							.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+//				}
+//
+//				client.createMenuEntry(-1)
+//						.setIdentifier(4)
+//						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+//						.setItemId(itemIdAtIndex)
+//						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//						.setOption("Withdraw-10")
+//						.setParam0(param0)
+//						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+//
+//				client.createMenuEntry(-1)
+//						.setIdentifier(3)
+//						.setType(MenuAction.CC_OP_LOW_PRIORITY)
+//						.setItemId(itemIdAtIndex)
+//						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//						.setOption("Withdraw-5")
+//						.setParam0(param0)
+//						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+//
+//
+//				if(quantityType != 0) {
+//					client.createMenuEntry(-1)
+//							.setIdentifier(2)
+//							.setType(MenuAction.CC_OP_LOW_PRIORITY)
+//							.setItemId(itemIdAtIndex)
+//							.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//							.setOption("Withdraw-1")
+//							.setParam0(param0)
+//							.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
+//				}
+//
+//				client.createMenuEntry(-1)
+//						.setIdentifier(1)
+//						.setType(MenuAction.CC_OP)
+//						.setItemId(itemIdAtIndex)
+//						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
+//						.setOption("Withdraw-" + suffix)
+//						.setParam0(param0)
+//						.setDeprioritized(false)
+//						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT)
+//						.onClick(menuEntry -> {
+//							final String message = new ChatMessageBuilder()
+//									.append("The default left click option for '").append(Text.removeTags(entry.getTarget())).append("' ")
+//									.append("has been reset.")
+//									.build();
+//						});
 
-				client.createMenuEntry(-1)
-						.setIdentifier(4)
-						.setType(MenuAction.CC_OP_LOW_PRIORITY)
-						.setItemId(itemIdAtIndex)
-						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-						.setOption("Withdraw-10")
-						.setParam0(param0)
-						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
-
-
-				client.createMenuEntry(-1)
-						.setIdentifier(3)
-						.setType(MenuAction.CC_OP_LOW_PRIORITY)
-						.setItemId(itemIdAtIndex)
-						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-						.setOption("Withdraw-5")
-						.setParam0(param0)
-						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
-
-
-				if(quantityType != 0) {
-					client.createMenuEntry(-1)
-							.setIdentifier(2)
-							.setType(MenuAction.CC_OP_LOW_PRIORITY)
-							.setItemId(itemIdAtIndex)
-							.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-							.setOption("Withdraw-1")
-							.setParam0(param0)
-							.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT);
-				}
-
-				client.createMenuEntry(-1)
-						.setIdentifier(1)
-						.setType(MenuAction.CC_OP)
-						.setItemId(itemIdAtIndex)
-						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
-						.setOption("Withdraw-" + suffix)
-						.setParam0(param0)
-						.setDeprioritized(false)
-						.setParam1(ComponentID.BANK_POTIONSTORE_CONTENT)
-						.onClick(menuEntry -> {
-							final String message = new ChatMessageBuilder()
-									.append("The default left click option for '").append(Text.removeTags(entry.getTarget())).append("' ")
-									.append("has been reset.")
-									.build();
-						});
-
-			} else if (!indexToWidget.containsKey(index)) {
+//			} else if (!indexToWidget.containsKey(index)) {
 				boolean preventPlaceholderMenuBug =
 						config.preventVanillaPlaceholderMenuBug() &&
 								client.getDraggedWidget() != null;
@@ -1495,8 +1520,8 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 						.setType(preventPlaceholderMenuBug ? MenuAction.CC_OP : MenuAction.RUNELITE_OVERLAY)
 						.setTarget(ColorUtil.wrapWithColorTag(itemName(itemIdAtIndex), itemTooltipColor))
 						.setParam0(index);
-			}
-		}
+			//}
+
 	}
 
 	/**
@@ -2022,7 +2047,7 @@ public class BankTagLayoutsPlugin extends Plugin implements MouseListener
 				draggedItemIndex = entry.getKey();
 			}
 		}
-
+		if (draggedItemIndex == -1) return;
 		customBankTagOrderInsert(layoutable, draggedItemIndex, draggedOnItemIndex);
 	}
 

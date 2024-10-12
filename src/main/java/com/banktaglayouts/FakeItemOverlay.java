@@ -1,5 +1,7 @@
 package com.banktaglayouts;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -7,6 +9,7 @@ import net.runelite.api.Point;
 import net.runelite.api.Varbits;
 import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.ItemQuantityMode;
+import net.runelite.api.widgets.JavaScriptCallback;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.overlay.Overlay;
@@ -17,6 +20,8 @@ import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 import javax.inject.Inject;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.util.HashMap;
+import java.util.Map;
 
 import static net.runelite.client.plugins.banktags.BankTagsPlugin.*;
 
@@ -42,6 +47,14 @@ public class FakeItemOverlay extends Overlay {
 
     @Inject
     private BankTagLayoutsConfig config;
+
+	@Inject private PotionStorage potionStorage;
+
+//	@Setter
+//	private JavaScriptCallback onDragCompleteListener;
+
+//	@Getter
+//	private final Map<Integer, Widget> potionStorageIndexToWidgets = new HashMap<>();
 
     FakeItemOverlay()
     {
@@ -76,7 +89,6 @@ public class FakeItemOverlay extends Overlay {
         graphics.clip(bankItemArea);
 
 		for (BankTagLayoutsPlugin.FakeItem fakeItem : plugin.fakeItems) {
-			Widget c = bankItemContainer.getChild(fakeItem.index);
 			if (fakeItem.isLayoutPlaceholder() && !config.showLayoutPlaceholders()) continue;
 
 			int dragDeltaX = 0;
@@ -92,8 +104,9 @@ public class FakeItemOverlay extends Overlay {
 			int y = BankTagLayoutsPlugin.getYForIndex(fakeItem.index) + yOffset - scrollY + dragDeltaY;
 			if (y + BankTagLayoutsPlugin.BANK_ITEM_HEIGHT > bankItemArea.getMinY() && y < bankItemArea.getMaxY())
 			{
-				if (fakeItem.isLayoutPlaceholder())
-				{
+				if(potionStorage.find(fakeItemId) >= 0) {
+					//RenderPotionInPotionStorage(bankItemContainer, fakeItem);
+				} else if (fakeItem.isLayoutPlaceholder()) {
 					graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
 					BufferedImage image = itemManager.getImage(fakeItemId, 1000, false);
 					graphics.drawImage(image, x, y, image.getWidth(), image.getHeight(), null);
@@ -107,72 +120,97 @@ public class FakeItemOverlay extends Overlay {
 						graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
 					}
 
-					int quantityType = client.getVarbitValue(Varbits.BANK_QUANTITY_TYPE);
-					int requestQty = client.getVarbitValue(Varbits.BANK_REQUESTEDQUANTITY);
-					// ~script2759
-//					String suffix;
-//					switch (quantityType)
-//					{
-//						default:
-//							suffix = "1";
-//							break;
-//						case 1:
-//							suffix = "5";
-//							break;
-//						case 2:
-//							suffix = "10";
-//							break;
-//						case 3:
-//							suffix = Integer.toString(Math.max(1, requestQty));
-//							break;
-//						case 4:
-//							suffix = "All";
-//							break;
-//					}
-//					c.clearActions();
-//
-//					c.setAction(0, "Withdraw-" + suffix);
-//					if (quantityType != 0)
-//					{
-//						c.setAction(1, "Withdraw-1");
-//					}
-//					c.setAction(2, "Withdraw-5");
-//					c.setAction(3, "Withdraw-10");
-//					if (requestQty > 0)
-//					{
-//						c.setAction(4, "Withdraw-" + requestQty);
-//					}
-//					c.setAction(5, "Withdraw-X");
-//					c.setAction(6, "Withdraw-All");
-//					c.setAction(7, "Withdraw-All-but-1");
-//					if (client.getVarbitValue(Varbits.BANK_LEAVEPLACEHOLDERS) == 0)
-//					{
-//						c.setAction(8, "Placeholder");
-//					}
-//					c.setAction(9, "Examine");
-//
-//					int posX = (fakeItem.index % BANK_ITEMS_PER_ROW) * (BANK_ITEM_WIDTH + BANK_ITEM_X_PADDING) + BANK_ITEM_START_X;
-//					int posY = (fakeItem.index / BANK_ITEMS_PER_ROW) * (BANK_ITEM_HEIGHT + BANK_ITEM_Y_PADDING);
-//
-//					ItemComposition def = client.getItemDefinition(fakeItemId);
-//					c.setItemId(fakeItemId);
-//					c.setItemQuantity(fakeItem.quantity);
-//					c.setItemQuantityMode(ItemQuantityMode.STACKABLE);
-//					c.setName("<col=ff9040>" + def.getName() + "</col>");
-//					c.setOriginalHeight(BankTagLayoutsPlugin.BANK_ITEM_HEIGHT);
-//					c.setOriginalWidth(BankTagLayoutsPlugin.BANK_ITEM_WIDTH);
-//					c.setOriginalX(posX);
-//					c.setOriginalY(posY);
-//					c.setHidden(false);
-//					c.revalidate();
-
 					boolean showQuantity = itemManager.getItemComposition(fakeItemId).isStackable() || fakeItem.quantity != 1;
 					BufferedImage image = itemManager.getImage(fakeItemId, fakeItem.quantity, showQuantity);
 					graphics.drawImage(image, x, y, image.getWidth(), image.getHeight(), null);
+
 				}
 			}
 		}
 
         return null;
     }
+
+//	void RenderPotionInPotionStorage(Widget bankItemContainer, BankTagLayoutsPlugin.FakeItem fakeItem){
+//
+//		if(potionStorageIndexToWidgets.containsKey(fakeItem.index)
+//				&& potionStorageIndexToWidgets.get(fakeItem.index) != null
+//				&& potionStorageIndexToWidgets.get(fakeItem.index).getItemId() == fakeItem.getItemId())
+//		{
+//			Widget c = potionStorageIndexToWidgets.get(fakeItem.index);
+//			setPotionMenuItems(c);
+//			c.setHidden(false);
+//			c.revalidate();
+//			return;
+//		}
+//
+//		Widget c = bankItemContainer.getChild(fakeItem.index);
+//		int fakeItemId = fakeItem.getItemId();
+//
+//		int posX = (fakeItem.index % BANK_ITEMS_PER_ROW) * (BANK_ITEM_WIDTH + BANK_ITEM_X_PADDING) + BANK_ITEM_START_X;
+//		int posY = (fakeItem.index / BANK_ITEMS_PER_ROW) * (BANK_ITEM_HEIGHT + BANK_ITEM_Y_PADDING);
+//		setPotionMenuItems(c);
+//		ItemComposition def = client.getItemDefinition(fakeItemId);
+//		c.setItemId(fakeItemId);
+//		c.setItemQuantity(fakeItem.quantity);
+//		c.setItemQuantityMode(ItemQuantityMode.STACKABLE);
+//		c.setName("<col=ff9040>" + def.getName() + "</col>");
+//		c.setOriginalHeight(BankTagLayoutsPlugin.BANK_ITEM_HEIGHT);
+//		c.setOriginalWidth(BankTagLayoutsPlugin.BANK_ITEM_WIDTH);
+//		c.setOriginalX(posX);
+//		c.setOriginalY(posY);
+//		c.setHidden(false);
+//		c.revalidate();
+//
+//		c.setOnDragCompleteListener(onDragCompleteListener);
+//		potionStorageIndexToWidgets.put(fakeItem.index, c);
+//	}
+//
+//	private void setPotionMenuItems(Widget c){
+//
+//		int quantityType = client.getVarbitValue(Varbits.BANK_QUANTITY_TYPE);
+//		int requestQty = client.getVarbitValue(Varbits.BANK_REQUESTEDQUANTITY);
+//		String suffix;
+//		switch (quantityType)
+//		{
+//			default:
+//				suffix = "1";
+//				break;
+//			case 1:
+//				suffix = "5";
+//				break;
+//			case 2:
+//				suffix = "10";
+//				break;
+//			case 3:
+//				suffix = Integer.toString(Math.max(1, requestQty));
+//				break;
+//			case 4:
+//				suffix = "All";
+//				break;
+//		}
+//
+//		c.clearActions();
+//
+//		c.setAction(0, "Withdraw-" + suffix);
+//		if (quantityType != 0)
+//		{
+//			c.setAction(1, "Withdraw-1");
+//		}
+//		c.setAction(2, "Withdraw-5");
+//		c.setAction(3, "Withdraw-10");
+//		if (requestQty > 0)
+//		{
+//			c.setAction(4, "Withdraw-" + requestQty);
+//		}
+//		c.setAction(5, "Withdraw-X");
+//		c.setAction(6, "Withdraw-All");
+//		c.setAction(7, "Withdraw-All-but-1");
+//		if (client.getVarbitValue(Varbits.BANK_LEAVEPLACEHOLDERS) == 0)
+//		{
+//			c.setAction(8, "Placeholder");
+//		}
+//		c.setAction(9, "Examine");
+//	}
+
 }
